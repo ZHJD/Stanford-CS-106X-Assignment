@@ -5,29 +5,24 @@
 
 #include "encoding.h"
 #include "filelib.h"
-#include <queue>
 #include "vector.h"
+#include "pqueue.h"
 
 using namespace std;
-// TODO: include any other headers you need
+
 
 #define SHORT_INT_SIZE sizeof(short int)
 
-struct compare {
-    bool operator()(const HuffmanNode* a, const HuffmanNode* b) {
-        return a->count > b->count;
-    }
-};
-
-
-
+/*
+ * traverse the encodingTree using preorder to get characters and pointers
+ */
 static void pre_order(HuffmanNode* encodingTree, Vector<int>& data, Vector<int>& nodes) {
     if(!encodingTree) {
         return;
     }
     if(encodingTree->isLeaf()) {
         nodes.push_back(0);
-        data.push_back(encodingTree->character);
+        data.push_back(encodingTree->character); // just store the leaf characters
         return;
     }
     nodes.push_back(1);
@@ -35,60 +30,86 @@ static void pre_order(HuffmanNode* encodingTree, Vector<int>& data, Vector<int>&
     pre_order(encodingTree->one, data, nodes);
 }
 
+/*
+ * write tree structure and character to compressed file as a header for decompression
+ */
 static void serializ(HuffmanNode* encodingTree, obitstream& output) {
     Vector<int> data;
     Vector<int> nodes;
     pre_order(encodingTree, data, nodes);
-    //output << data;
-    cout << data.size() << endl;
+    output << data; // first write data
+    //cout << data.size() << endl;
     for(int elem : nodes) {
-        output.writeBit(elem);
+        output.writeBit(elem); // second write info about tree structure from preorder
     }
 }
 
-static HuffmanNode* constructTree(ibitstream& input, const Vector<int>& data, int& pos) {
-    if(pos >= data.size()) {
-        return nullptr;
-    }
+/*
+ * according to the header in compressed file to reconstruct the tree
+ */
+static HuffmanNode* constructTree(ibitstream& input, Vector<int>& data) {
     int bit = input.readBit();
     if(bit == 0) {
-        HuffmanNode* root = new HuffmanNode(data[pos]);
-        pos += 1;
+        HuffmanNode* root = new HuffmanNode(data.pop_front());
         return root;
     }
     else {
+        /*
+         * because huffman tree only has the node with degree zero and degree two,
+         * not including degree one node,so we are confident to construct zero and
+         * one without any judgement.Otherwise, we have to using outside node.
+         */
         HuffmanNode* root = new HuffmanNode();
-        root->zero = constructTree(input, data, pos);
-        root->one  = constructTree(input, data, pos);
+        root->zero = constructTree(input, data);
+        root->one  = constructTree(input, data);
         return root;
     }
 }
 
+/*
+ * reconstruct the encoding tree for decompression
+ */
 static HuffmanNode* deserializ(ibitstream& input) {
     Vector<int> data;
-    input >> data;
-    //cout << data.size() << endl;
-    int pos = 0;
-    return constructTree(input, data, pos);
+    input >> data; // read vector data from input file.
+    return constructTree(input, data);
 }
 
+/*
+ * buildFrequencyTable - scan every byte in input stream, and to
+ * compute the frequency of every bit,in other words, we get the
+ * frequency of 0-255(one byte),not just ASCII code,by doing this,
+ * not only can we encode txt file, but also can encode image,audio..
+ */
 Map<int, int> buildFrequencyTable(istream& input) {
-    // TODO: implement this function
-    Map<int, int> freqTable;   // this is just a placeholder so it will compile
+    Map<int, int> freqTable;
     for(int ch = input.get(); !input.fail(); ch = input.get()) {
         freqTable[ch]++;
     }
+    /*
+     * PSEUDO_EOF: this is a macro defined in another file,it's value
+     * is 256,as we all know,it is a two byte value,so PSEUDO_EOF is
+     * different from any byte we need to encode.we need to write PSEUDO_EOF's
+     * encode to compressed file,because the sum of all bits may not be
+     * divided by 8,but the final file will write another some bits to
+     * be divided by 8. so if no PSEUDO_EOF,we actually don't know the
+     * truly end.
+     */
     freqTable[PSEUDO_EOF] = 1;
-    rewindStream(input);       // tells the stream to seek back to the beginning
+    rewindStream(input); // rewind input stream to file start
     return freqTable;
 }
 
+/*
+ * buildEncodingTree - by using min-heap to build huffman tree
+ */
 HuffmanNode* buildEncodingTree(const Map<int, int>& freqTable) {
-    priority_queue<HuffmanNode*, vector<HuffmanNode*>, compare>pq;
+    // lower priority numbers correspond to higher effective priorities
+    auto pq = PriorityQueue<HuffmanNode*>();
     HuffmanNode *node = nullptr;
     for(const auto& key : freqTable.keys()) {
         node = new HuffmanNode(key, freqTable.get(key));
-        pq.push(node);
+        pq.enqueue(node, node->count);
     }
 
     node = nullptr;
@@ -96,20 +117,20 @@ HuffmanNode* buildEncodingTree(const Map<int, int>& freqTable) {
     HuffmanNode *zero = nullptr;
     HuffmanNode *one  = nullptr;
     while(pq.size() > 1) {
-        zero = pq.top();
-        pq.pop();
-        one  = pq.top();
-        pq.pop();
+        zero = pq.dequeue();
+        one  = pq.dequeue();
         node = new HuffmanNode(NOT_A_CHAR, zero->count + one->count,
                                zero,
                                one);
-        pq.push(node);
-
+        pq.enqueue(node, node->count);
     }
-    return pq.top();   // this is just a placeholder so it will compile
+    return pq.dequeue();
 }
 
-static void dfs(HuffmanNode* encodingTree, Map<int, string>& encodingMap, string s) {
+/*
+ * to traverse encoding tree to get encoding map
+ */
+static void dfs(const HuffmanNode* encodingTree, Map<int, string>& encodingMap, string s) {
     if(!encodingTree) {
         return;
     }
@@ -125,7 +146,6 @@ static void dfs(HuffmanNode* encodingTree, Map<int, string>& encodingMap, string
 
 
 Map<int, string> buildEncodingMap(HuffmanNode* encodingTree) {
-    // TODO: implement this function
     Map<int, string> encodingMap;
     dfs(encodingTree, encodingMap, "");
     return encodingMap;
@@ -161,7 +181,7 @@ void decodeData(ibitstream& input, HuffmanNode* encodingTree, ostream& output) {
         else {
             break;
         }
-        node = encodingTree;
+        node = encodingTree; // return to root for another byte
     }
 }
 
