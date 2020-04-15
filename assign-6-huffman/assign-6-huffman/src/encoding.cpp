@@ -10,8 +10,37 @@
 
 using namespace std;
 
+static void inline writeMagic(obitstream& output);
+static bool inline isHuf(ibitstream& input);
+static void pre_order(HuffmanNode* encodingTree, Vector<int>& data, Vector<int>& nodes);
+static void serializ(HuffmanNode* encodingTree, obitstream& output);
+static HuffmanNode* constructTree(ibitstream& input, Vector<int>& data);
+static HuffmanNode* deserializ(ibitstream& input);
+static void dfs(const HuffmanNode* encodingTree, Map<int, string>& encodingMap, string s);
+static void deleteTree(HuffmanNode* &node);
 
-#define SHORT_INT_SIZE sizeof(short int)
+static const string magic = "huf";  // magic number
+
+/*
+ * write marks to encoding file
+ */
+static void inline writeMagic(obitstream& output) {
+    for(char byte : magic) {
+        output.put(byte);
+    }
+}
+
+/*
+ * check this file whether is a huffman encoding file
+ */
+static bool inline isHuf(ibitstream& input) {
+    for(char byte : magic) {
+        if(input.get() != byte) {
+            return false;
+        }
+    }
+    return true;
+}
 
 /*
  * traverse the encodingTree using preorder to get characters and pointers
@@ -144,7 +173,6 @@ static void dfs(const HuffmanNode* encodingTree, Map<int, string>& encodingMap, 
     dfs(encodingTree->one, encodingMap, s);
 }
 
-
 Map<int, string> buildEncodingMap(HuffmanNode* encodingTree) {
     Map<int, string> encodingMap;
     dfs(encodingTree, encodingMap, "");
@@ -189,13 +217,20 @@ void compress(istream& input, obitstream& output) {
     const auto freqTable = buildFrequencyTable(input);
     const auto encodingTree = buildEncodingTree(freqTable);
     const auto encodingMap = buildEncodingMap(encodingTree);
+    writeMagic(output);
     serializ(encodingTree, output);
     encodeData(input, encodingMap, output);
+    freeTree(encodingTree);
 }
 
 void decompress(ibitstream& input, ostream& output) {
+    if(!isHuf(input)) {
+        cout << "This is not a Huffman encoding file!\n";
+        return;
+    }
     const auto encodingTree = deserializ(input);
     decodeData(input, encodingTree, output);
+    freeTree(encodingTree);
 }
 
 static void deleteTree(HuffmanNode* &node) {
