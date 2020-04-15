@@ -44,8 +44,10 @@ static void test_freeTree(HuffmanNode* encodingTree);
 static void test_binaryFileViewer();
 static void test_textFileViewer();
 static void test_sideBySideComparison();
+static void test_sideBySideComparison(const string& filename1, const string& filename2);
 static istream* openInputStream(string data, bool isFile, bool isBits = false);
 static istream* openStringOrFileInputStream(string& data, bool& isFile, bool isBits = false);
+static void test_compress_and_decompress_comparison();
 
 int main() {
     intro();
@@ -85,6 +87,8 @@ int main() {
         } else if (choice == "F") {
             test_freeTree(encodingTree);
             encodingTree = NULL;
+        } else if (choice == "Z") {
+            test_compress_and_decompress_comparison();
         }
     }
 
@@ -125,6 +129,7 @@ static string menu() {
     cout << "B) binary file viewer" << endl;
     cout << "T) text file viewer" << endl;
     cout << "S) side-by-side file comparison" << endl;
+    cout << "Z) compress and decompress" << endl;
     cout << "Q) quit" << endl;
 
     cout << endl;
@@ -290,6 +295,8 @@ static void test_compress() {
 
     if (fileExists(outputFileName)) {
         cout << "Wrote " << fileSize(outputFileName) << " compressed bytes." << endl;
+        cout << "compression rate is " << 1.0 * 100 * fileSize(outputFileName) / inputFileSize <<
+                "%.\n";
     } else {
         cout << "Compressed output file was not found; perhaps there was an error." << endl;
     }
@@ -335,6 +342,10 @@ static void test_decompress() {
     } else {
         cout << "Decompressed output file was not found; perhaps there was an error." << endl;
     }
+    // to test original file is equal to decoded file
+    string filename1 = inputFileName.substr(0, inputFileName.find_last_of(".")) + ".txt";
+    string filename2 = inputFileName.substr(0, inputFileName.find_last_of(".")) + "-out.txt";
+    test_sideBySideComparison(filename1, filename2);
 }
 
 /*
@@ -380,6 +391,33 @@ static void test_textFileViewer() {
     cout << "Here is the text data (" << fileText.length() << " bytes):" << endl;
     cout << fileText << endl;
     input.close();
+}
+
+/*
+ * test original file is equal to decoded file
+ */
+static void test_sideBySideComparison(const string& filename1, const string& filename2) {
+    string fileText1 = readEntireFileText(filename1);
+    string fileText2 = readEntireFileText(filename2);
+
+    // compare the two sequences to find a mismatch
+    pair<string::const_iterator, string::const_iterator> diff =
+        mismatch(fileText1.begin(), fileText1.end(), fileText2.begin());
+    if (diff.first != fileText1.end()) {
+        ptrdiff_t offset = diff.first - fileText1.begin();
+        cout << "File data differs at byte offset " << offset << ":" << endl;
+        cout << setw(16) << filename1 << " has value " << setw(3) << (int) (*diff.first)  << " ("
+             << toPrintableChar(*diff.first)  << ")" << endl;
+        cout << setw(16) << filename2 << " has value " << setw(3) << (int) (*diff.second) << " ("
+             << toPrintableChar(*diff.second) << ")" << endl;
+        int size1 = fileSize(filename1);
+        int size2 = fileSize(filename2);
+        if (size1 != size2) {
+            cout << "File sizes differ! " << size1 << " vs. " << size2 << " bytes." << endl;
+        }
+    } else {
+        cout << "Files match!" << endl;
+    }
 }
 
 /*
@@ -467,4 +505,10 @@ static istream* openStringOrFileInputStream(string& data, bool& isFile, bool isB
         }
     }
     return openInputStream(data, isFile, isBits);
+}
+
+static void test_compress_and_decompress_comparison() {
+    test_compress();
+    cout << "begin to decompress!\n";
+    test_decompress();
 }
