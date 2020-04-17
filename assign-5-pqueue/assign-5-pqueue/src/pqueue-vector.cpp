@@ -39,7 +39,8 @@ void VectorPQueue::enqueue(const string& elem) {
 
 void VectorPQueue::insertToNewPQ(VectorPQueue *old_pq, VectorPQueue *new_pq) {
     while(!old_pq->isEmpty()) {
-        new_pq->enqueue(old_pq->extractMin());
+        new_pq->enqueue(old_pq->m_vector.pop_front());
+        old_pq->logSize--;
     }
 }
 
