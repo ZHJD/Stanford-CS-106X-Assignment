@@ -2,6 +2,14 @@
 #include "pqueue.h"
 #include <string>
 
+struct DLNode {
+    std::string val;
+    DLNode *prev;
+    DLNode *next;
+
+    DLNode(std::string _val = "") : val(_val){}
+};
+
 class LinkedListPQueue : public PQueue {
 public:
 	LinkedListPQueue();
@@ -14,6 +22,12 @@ public:
     const std::string& peek() const;
 	
 private:
-	// provide data methods and helper methods to
-    // help realize the linked list-backed PQueue
+    DLNode *head;
+    DLNode *tail;
+
+    friend void insertBefore(DLNode *before, DLNode *node);
+
 };
+
+
+
