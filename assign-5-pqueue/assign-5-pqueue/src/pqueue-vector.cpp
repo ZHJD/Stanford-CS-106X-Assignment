@@ -48,5 +48,9 @@ VectorPQueue *VectorPQueue::merge(VectorPQueue *one, VectorPQueue *two) {
     VectorPQueue* new_pq = new VectorPQueue();
     insertToNewPQ(one, new_pq);
     insertToNewPQ(two, new_pq);
+    delete one;
+    one = nullptr;
+    delete two;
+    two = nullptr;
     return new_pq;
 }

@@ -91,14 +91,21 @@ HeapPQueue *HeapPQueue::merge(HeapPQueue *one, HeapPQueue *two) {
     int twoLogSize = two->logSize;
     HeapPQueue *newPQ = new HeapPQueue(oneLogSize + twoLogSize + 1);
     newPQ->logSize = oneLogSize + twoLogSize;
+
     for(int i = 1; i <= oneLogSize; i++) {
         newPQ->m_array[newPQ->m_pos++] = one->m_array[i];
     }
     for(int i = 1; i <= twoLogSize; i++) {
         newPQ->m_array[newPQ->m_pos++] = two->m_array[i];
     }
+
+    // heapify
     for(int i = (newPQ->m_pos - 1) / 2; i >= 1; i--) {
         adjustDown(newPQ, i);
     }
+    delete one;
+    one = nullptr;
+    delete two;
+    two = nullptr;
     return newPQ;
 }
